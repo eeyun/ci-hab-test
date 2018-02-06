@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 if [[ "${1}" == 'cluster' ]]; then
   consul_host=${CLUSTER_HOST}

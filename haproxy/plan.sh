@@ -1,4 +1,4 @@
-pkg_origin=starkandwayne
+pkg_origin=eeyun
 pkg_name=haproxy
 pkg_description="The Reliable, High Performance TCP/HTTP Load Balancer"
 pkg_version=1.6.11

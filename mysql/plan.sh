@@ -1,5 +1,5 @@
 pkg_name=mysql
-pkg_origin=starkandwayne
+pkg_origin=eeyun
 pkg_version=5.7.17
 pkg_maintainer="Ramon Makkelie <makkelie@starkandwayne.com>"
 pkg_license=('GPL-2.0')

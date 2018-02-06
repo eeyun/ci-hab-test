@@ -1,6 +1,6 @@
 pkg_name=rabbitmq
 pkg_distname=${pkg_name}-server
-pkg_origin=starkandwayne
+pkg_origin=eeyun
 pkg_version=3.6.9
 pkg_maintainer="Ramon Makkelie <makkelie@starkandwayne.com>"
 pkg_license=('MPL')

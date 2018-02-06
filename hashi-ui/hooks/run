@@ -1,5 +1,0 @@
-#!/bin/bash
-
-source "{{pkg.svc_config_path}}/environment.sh"
-
-hashi-ui

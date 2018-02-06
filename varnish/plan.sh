@@ -1,6 +1,6 @@
 
 pkg_name=varnish
-pkg_origin=starkandwayne
+pkg_origin=eeyun
 pkg_description="Varnish Cache"
 pkg_license=('bsd')
 pkg_version="5.1.2"

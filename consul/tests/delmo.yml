@@ -1,5 +1,5 @@
 suite:
-  name: starkandwayne-consul
+  name: eeyun-consul
   system: docker-compose.yml
   task_service: tests
 
@@ -18,8 +18,8 @@ tests:
       - cluster-persist-value
 - name: cluster-failover
   spec:
-    - {wait: cluster-ready, timeout: 120}
-    - {wait: has-leader, timeout: 120}
+    - {wait: cluster-ready, timeout: 180}
+    - {wait: has-leader, timeout: 180}
     - stop: [consul3]
     - destroy: [consul3]
     - assert:

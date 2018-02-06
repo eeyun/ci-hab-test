@@ -2,7 +2,7 @@
 # See full docs at https://www.habitat.sh/docs/reference/plan-syntax/
 
 pkg_name=wordpress-proxy
-pkg_origin=starkandwayne
+pkg_origin=eeyun
 pkg_maintainer="Ramon Makkelie <makkelie@starkandwayne.com>"
 pkg_license=('Apache-2.0')
 pkg_version=4.7.4

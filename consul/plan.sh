@@ -1,4 +1,4 @@
-pkg_origin=starkandwayne
+pkg_origin=eeyun
 pkg_name=consul
 pkg_version=0.8.2
 pkg_maintainer='Stark & Wayne beahero@starkandwayne.com'

@@ -1,5 +1,5 @@
 pkg_name=redis
-pkg_origin=starkandwayne
+pkg_origin=eeyun
 pkg_version=3.2.8
 pkg_description="Persistent key-value database, with built-in net interface"
 pkg_upstream_url=http://redis.io/

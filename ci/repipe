@@ -1,199 +1,79 @@
 #!/bin/bash
 
 PIPELINE=$(cd $(dirname ${BASH_SOURCE[0]}) ; pwd)
-hab_origin=starkandwayne
+hab_origin=eeyun
 
 pushd $PIPELINE >/dev/null
   rm -rf packages
-  mkdir packages deps tests
+  mkdir packages tests
   for package in $(find .. -d -maxdepth 1); do
     if [[ -f ${package}/plan.sh ]]; then
       package_name=$(basename ${package})
       source ${package}/plan.sh
-
-      for dep in "${pkg_deps[@]}"; do
-        version=""
-        version_entry=""
-        dep_origin=$(dirname ${dep})
-        dep_name=$(basename ${dep})
-
-        if [[ $(dirname ${dep_origin}) != "." ]]; then
-          version_entry="    version: ${dep_name}"
-          version="-${dep_name}"
-          dep_name="$(basename ${dep_origin})"
-          dep_origin=$(dirname ${dep_origin})
-        fi
-
-        cat > deps/${package_name}-${dep_origin}-${dep_name}${version}-dep.yml <<EOF
-jobs:
-- name: build-${package_name}
-  plan:
-  - (( inline ))
-  - aggregate:
-    - (( append ))
-    - {get: ${dep_origin}-${dep_name}${version}-pkg, trigger: true}
-
-resources:
-- name: ${dep_origin}-${dep_name}${version}-pkg
-  type: hab-pkg
-  source:
-    channel: stable
-    origin: ${dep_origin}
-    name: ${dep_name}
-${version_entry}
-EOF
-      done
       cat > packages/${package_name}.yml <<EOF
 ---
 groups:
 - name: ${package_name%-*}
   jobs:
   - (( append ))
-  - build-${package_name}
+  - validate-${package_name}
+  - test-${package_name}
   - release-${package_name}
 - name: all-packages
   jobs:
   - (( append ))
-  - build-${package_name}
+  - test-${package_name}
   - release-${package_name}
 
 jobs:
-- name: build-${package_name}
+- name: validate-${package_name}
   public: true
   plan:
   - (( inline ))
   - aggregate:
     - (( append ))
-    - {get: ${package_name}-plan, trigger: true}
+    - get: ${hab_origin}-${package_name}-bldr-group
+      trigger: true
     - {get: habitat-plans-ci}
-  - task: build-${package_name}
+  - task: validate-${package_name}-group
     privileged: true
     config:
       platform: linux
       image_resource:
         type: docker-image
-        source: { repository: starkandwayne/habitat-plans-pipeline }
+        source: { repository: eeyun/habitat-plans-pipeline }
       inputs:
-      - name: ${package_name}-plan
+      - name: ${hab_origin}-${package_name}-bldr-group
       - name: habitat-plans-ci
       outputs:
       - name: result
       run:
-        path: ./habitat-plans-ci/ci/scripts/build-service
+        path: ./habitat-plans-ci/ci/scripts/validate-group
       params:
-        PACKAGE_CONTEXT: ${package_name}-plan/${package_name}
-        OUT: result
+        GROUP_CONTEXT: ${hab_origin}-${package_name}-bldr-group
         HAB_ORIGIN: ${hab_origin}
         PLAN_NAME: ${package_name}
         HAB_ORIGIN_KEY: (( grab meta.habitat.origin_key ))
-  - aggregate:
-    - put: ${hab_origin}-${package_name}-image
-      params:
-        load_file: result/${hab_origin}-${package_name}-docker.tar
-        load_repository: ${hab_origin}/${package_name}
-        load_tag: habitat
-        tag: result/docker_tag
-    - put: ${hab_origin}-${package_name}-edge-image
-      params:
-        load_file: result/${hab_origin}-${package_name}-docker.tar
-        load_repository: ${hab_origin}/${package_name}
-        load_tag: habitat
-    - put: ${hab_origin}-${package_name}-unstable
-      params:
-        result: result
-- name: release-${package_name}
-  public: true
-  plan:
-  - aggregate:
-    - {get: ${hab_origin}-${package_name}-unstable, passed: [build-${package_name}]}
-    - get: ${hab_origin}-${package_name}-image
-      passed: [build-${package_name}]
-      params:
-        save: true
-  - aggregate:
-    - put: ${hab_origin}-${package_name}-image
-      params:
-        load: ${hab_origin}-${package_name}-image
-        tag_as_latest: true
-    - put: ${hab_origin}-${package_name}-pkg
-      params:
-        result: ${hab_origin}-${package_name}-unstable
-resources:
-- name: ${hab_origin}-${package_name}-pkg
-  type: hab-pkg
-  source:
-    channel: stable
-    origin: (( grab meta.habitat.origin ))
-    name: ${package_name}
-    auth_token: (( grab meta.habitat.auth_token ))
-
-- name: ${package_name}-plan
-  type: git
-  source:
-    uri: https://github.com/starkandwayne/habitat-plans.git
-    paths: [${package_name}/*]
-    ignore_paths: [${package_name}/tests/*, ${package_name}/README.md]
-
-- name: ${hab_origin}-${package_name}-image
-  type: docker-image
-  source:
-    email: (( grab meta.dockerhub.email ))
-    username: (( grab meta.dockerhub.username ))
-    password: (( grab meta.dockerhub.password ))
-    repository: starkandwayne/${package_name}
-
-- name: ${hab_origin}-${package_name}-edge-image
-  type: docker-image
-  source:
-    email: (( grab meta.dockerhub.email ))
-    username: (( grab meta.dockerhub.username ))
-    password: (( grab meta.dockerhub.password ))
-    repository: starkandwayne/${package_name}
-    tag: "edge"
-
-- name: ${hab_origin}-${package_name}-unstable
-  type: hab-pkg
-  source:
-    channel: unstable
-    origin: (( grab meta.habitat.origin ))
-    name: ${package_name}
-    auth_token: (( grab meta.habitat.auth_token ))
-EOF
-      if [[ -f ${package}/tests/delmo.yml ]]; then
-        cat > tests/${package_name}-tests.yml <<EOF
----
-groups:
-- name: ${package_name%-*}
-  jobs:
-  - (( append ))
-  - test-${package_name}
-- name: all-packages
-  jobs:
-  - (( append ))
-  - test-${package_name}
-jobs:
 - name: test-${package_name}
   public: false
   serial: true
   serial_groups: [delmo]
   plan:
   - aggregate:
-    - get: ${hab_origin}-${package_name}-edge-image
-      params: {skip_download: true}
+    - get: ${hab_origin}-${package_name}-bldr-group
       trigger: true
-      passed: [build-${package_name}]
-    - {get: ${package_name}-tests, trigger: true}
-    - {get: ${hab_origin}-${package_name}-unstable, passed: [build-${package_name}]}
-    - get: ${hab_origin}-${package_name}-image
-      passed: [build-${package_name}]
-      params: {skip_download: true}
+      passed: [validate-${package_name}]
+    - {get: ${package_name}-tests}
   - task: test-${package_name}
+    privileged: true
     config:
       platform: linux
       image_resource:
         type: docker-image
-        source: { repository: bodymindarts/delmo-concourse }
+        source: { repository: eeyun/hab-delmo }
       params:
+        GROUP_CONTEXT: ${hab_origin}-${package_name}-bldr-group
+        PKG_CONTEXT: ${package_name}
         MACHINE_EXPORT_AWS_ACCESS_KEY_ID: (( grab meta.aws.access_key_id ))
         MACHINE_EXPORT_AWS_SECRET_ACCESS_KEY: (( grab meta.aws.secret_access_key ))
         MACHINE_EXPORT_AWS_REGION: (( grab meta.aws.region ))
@@ -202,40 +82,85 @@ jobs:
         AWS_ACCESS_KEY: (( grab meta.aws.access_key_id ))
         AWS_SECRET_KEY: (( grab meta.aws.secret_access_key ))
         AWS_REGION: (( grab meta.aws.region ))
-        AWS_BUCKET: (( grab meta.aws.shield-test-bucket ))
       inputs:
       - name: ${package_name}-tests
+      - name: ${hab_origin}-${package_name}-bldr-group
+      outputs:
+      - name: notify_message
       run:
         path: /entrypoint.sh
-        args: [delmo, --only-build-task, -f, ${package_name}-tests/${package_name}/tests/delmo.yml, -m, (( grab meta.delmo.machine_name ))]
+    ensure:
+      put: notify
+      params:
+        username: Hab-CI
+        icon_url: https://brand.chef.io/images/habitat/logos/logo-3.png
+        text_file: notify_message/message
 - name: release-${package_name}
+  public: true
   plan:
   - (( inline ))
   - aggregate:
     - (( inline ))
-    - get: ${hab_origin}-${package_name}-unstable
-      passed:
-      - test-${package_name}
-    - get: ${hab_origin}-${package_name}-image
-      passed:
-      - test-${package_name}
+    - get: ${hab_origin}-${package_name}-bldr-group
+      passed: [test-${package_name}]
+      trigger: true
+    - {get: habitat-plans-ci}
+  - task: release-${package_name}
+    privileged: true
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source: { repository: eeyun/habitat-plans-pipeline }
+      params:
+        GROUP_CONTEXT: ${hab_origin}-${package_name}-bldr-group
+        PKG_CONTEXT: ${hab_origin}/${package_name}
+      inputs:
+      - name: ${hab_origin}-${package_name}-bldr-group
+      - name: habitat-plans-ci
+      outputs:
+      - name: notify_message
+      run:
+        path: ./habitat-plans-ci/ci/scripts/release_notify
+  - aggregate:
+    - put: ${hab_origin}-${package_name}-bldr-group
+      params:
+        result: ${hab_origin}-${package_name}-bldr-group
+      on_success:
+        put: notify
+        params:
+          username: Hab-CI
+          icon_url: https://brand.chef.io/images/habitat/logos/logo-3.png
+          text_file: notify_message/success_message
+      on_failure:
+        put: notify
+        params:
+          username: Hab-CI
+          icon_url: https://brand.chef.io/images/habitat/logos/logo-3.png
+          text_file: notify_message/failure_message
 
 resources:
+- name: ${hab_origin}-${package_name}-bldr-group
+  type: bldr-job
+  source:
+    origin: (( grab meta.habitat.origin ))
+    name: ${package_name}
+    auth_token: (( grab meta.habitat.auth_token ))
 - name: ${package_name}-tests
   type: git
   source:
-    uri: https://github.com/starkandwayne/habitat-plans.git
+    uri: https://github.com/eeyun/ci-hab-test.git
     paths: [${package_name}/tests/*]
 EOF
-      fi
+#      fi
     fi
   done
 
   trap "rm -f ${PIPELINE}/.deploy.yml" INT QUIT TERM EXIT
-  spruce merge base.yml deps/*.yml packages/*.yml tests/*.yml settings.yml > .deploy.yml tests/*.yml && \
-    REDACT=yes spruce merge --prune meta base.yml deps/*.yml packages/*.yml tests/*.yml settings.yml > pipeline.yml && \
-    fly --target sw set-pipeline --pipeline habitat-plans --config .deploy.yml     &&
-    fly --target sw unpause-pipeline --pipeline habitat-plans
+  spruce merge base.yml packages/*.yml > .deploy.yml && \
+    REDACT=yes spruce merge --prune meta base.yml packages/*.yml > pipeline.yml && \
+    fly --target lite2 set-pipeline --pipeline habitat-plans --config .deploy.yml     &&
+    fly --target lite2 unpause-pipeline --pipeline habitat-plans
 
-  rm -rf packages deps tests
+  rm -rf packages tests
 popd >/dev/null

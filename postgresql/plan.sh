@@ -1,6 +1,6 @@
 pkg_name=postgresql
 pkg_version=9.6.3
-pkg_origin=starkandwayne
+pkg_origin=eeyun
 pkg_maintainer="The Habitat Maintainers <humans@habitat.sh>"
 pkg_description="PostgreSQL is a powerful, open source object-relational database system."
 pkg_upstream_url="https://www.postgresql.org/"
