@@ -1,25 +1,28 @@
 ---
 meta:
   delmo:
-    machine_name: habitat-plans-pipeline-machine
+    machine_name: REDACTED
   dockerhub:
-    email: (( vault "secret/pipelines/habitat-plans/dockerhub:email" ))
-    username: (( vault "secret/pipelines/habitat-plans/dockerhub:username" ))
-    password: (( vault "secret/pipelines/habitat-plans/dockerhub:password" ))
+    email: REDACTED
+    username: REDACTED
+    password: REDACTED
   habitat:
-    origin_key: (( vault "secret/pipelines/habitat-plans/habitat:origin_key" ))
-    auth_token: (( vault "secret/pipelines/habitat-plans/habitat:auth_token" ))
-    origin: starkandwayne
+    origin_key: REDACTED
+    auth_token: REDACTED
+    origin: core
   aws:
-    habitat-artifacts-bucket: snw-habitat-packages
-    docker-machine-bucket: docker-machine-exports
-    shield-test-bucket: shield-habitat-test
-    access_key_id: (( vault "secret/pipelines/habitat-plans/aws:access_key_id" ))
-    secret_access_key: (( vault "secret/pipelines/habitat-plans/aws:secret_access_key" ))
-    region: eu-central-1
-  digitalocean:
-    access_token: (( vault "secret/pipelines/habitat-plans/digitalocean:access_token" ))
-    region: fra1
+    docker-machine-bucket: docker-machine-bucket
+    docker-machine-ami: ami-41e0b93b
+    access_key_id: REDACTED
+    secret_access_key: REDACTED
+    region: us-east-1
+  concourse:
+    target: http://ip.of.concourse.web:8080
+    team: REDACTED
+    user: REDACTED
+    password: REDACTED
+  slack:
+    webhook: REDACTED
 
 groups:
 - name: all-packages
@@ -53,27 +56,24 @@ jobs:
         source: { repository: bodymindarts/docker-machine-setup }
       params:
         MACHINE_NAME: (( grab meta.delmo.machine_name ))
-        DIGITALOCEAN_ACCESS_TOKEN: (( grab meta.digitalocean.access_token ))
-        DIGITALOCEAN_REGION: (( grab meta.digitalocean.region ))
         AWS_DEFAULT_REGION: (( grab meta.aws.region ))
         AWS_ACCESS_KEY_ID: (( grab meta.aws.access_key_id ))
         AWS_SECRET_ACCESS_KEY: (( grab meta.aws.secret_access_key ))
         AWS_BUCKET: (( grab meta.aws.docker-machine-bucket ))
-
       run:
-        path: /setup-digitalocean
+        path: /setup-aws
 
 resources:
 - name: habitat-plans-pipeline
   type: git
   source:
-    uri: https://github.com/starkandwayne/habitat-plans.git
+    uri: https://github.com/eeyun/ci-hab-test.git
     paths: [ci/image/*]
 
 - name: habitat-plans-ci
   type: git
   source:
-    uri: https://github.com/starkandwayne/habitat-plans.git
+    uri: https://github.com/eeyun/ci-hab-test.git
     paths: [ci/*]
 
 - name: habitat-release
@@ -81,7 +81,7 @@ resources:
   source:
     user:         habitat-sh
     repository:   habitat
-    access_token:  (( vault "secret/pipelines/habitat-plans/github:token" ))
+    access_token:  REDACTED
 
 - name: habitat-plans-pipeline-image
   type: docker-image
@@ -89,10 +89,25 @@ resources:
     email: (( grab meta.dockerhub.email ))
     username: (( grab meta.dockerhub.username ))
     password: (( grab meta.dockerhub.password ))
-    repository: starkandwayne/habitat-plans-pipeline
+    repository: eeyun/habitat-plans-pipeline
+
+- name: notify
+  type: slack-notification
+  source:
+    url: (( grab meta.slack.webhook ))
 
 resource_types:
 - name: hab-pkg
   type: docker-image
   source:
     repository: cfcommunity/habitat-resource
+
+- name: bldr-job
+  type: docker-image
+  source:
+    repository: eeyun/bldr-resource
+
+- name: slack-notification
+  type: docker-image
+  source:
+    repository: cfcommunity/slack-notification-resource

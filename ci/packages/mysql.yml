@@ -1,41 +1,28 @@
-#!/bin/bash
-
-PIPELINE=$(cd $(dirname ${BASH_SOURCE[0]}) ; pwd)
-hab_origin=eeyun
-
-pushd $PIPELINE >/dev/null
-  rm -rf packages
-  mkdir packages tests
-  for package in $(find .. -d -maxdepth 1); do
-    if [[ -f ${package}/plan.sh ]]; then
-      package_name=$(basename ${package})
-      source ${package}/plan.sh
-      cat > packages/${package_name}.yml <<EOF
 ---
 groups:
-- name: ${package_name%-*}
+- name: mysql
   jobs:
   - (( append ))
-  - validate-${package_name}
-  - test-${package_name}
-  - release-${package_name}
+  - validate-mysql
+  - test-mysql
+  - release-mysql
 - name: all-packages
   jobs:
   - (( append ))
-  - test-${package_name}
-  - release-${package_name}
+  - test-mysql
+  - release-mysql
 
 jobs:
-- name: validate-${package_name}
+- name: validate-mysql
   public: true
   plan:
   - (( inline ))
   - aggregate:
     - (( append ))
-    - get: ${hab_origin}-${package_name}-bldr-group
+    - get: eeyun-mysql-bldr-group
       trigger: true
     - {get: habitat-plans-ci}
-  - task: validate-${package_name}-group
+  - task: validate-mysql-group
     privileged: true
     config:
       platform: linux
@@ -43,28 +30,28 @@ jobs:
         type: docker-image
         source: { repository: eeyun/habitat-plans-pipeline }
       inputs:
-      - name: ${hab_origin}-${package_name}-bldr-group
+      - name: eeyun-mysql-bldr-group
       - name: habitat-plans-ci
       outputs:
       - name: result
       run:
         path: ./habitat-plans-ci/ci/scripts/validate-group
       params:
-        GROUP_CONTEXT: ${hab_origin}-${package_name}-bldr-group
-        HAB_ORIGIN: ${hab_origin}
-        PLAN_NAME: ${package_name}
+        GROUP_CONTEXT: eeyun-mysql-bldr-group
+        HAB_ORIGIN: eeyun
+        PLAN_NAME: mysql
         HAB_ORIGIN_KEY: (( grab meta.habitat.origin_key ))
-- name: test-${package_name}
+- name: test-mysql
   public: false
   serial: true
   serial_groups: [delmo]
   plan:
   - aggregate:
-    - get: ${hab_origin}-${package_name}-bldr-group
+    - get: eeyun-mysql-bldr-group
       trigger: true
-      passed: [validate-${package_name}]
-    - {get: ${package_name}-tests}
-  - task: test-${package_name}
+      passed: [validate-mysql]
+    - {get: mysql-tests}
+  - task: test-mysql
     privileged: true
     config:
       platform: linux
@@ -72,8 +59,8 @@ jobs:
         type: docker-image
         source: { repository: eeyun/hab-delmo }
       params:
-        GROUP_CONTEXT: ${hab_origin}-${package_name}-bldr-group
-        PKG_CONTEXT: ${package_name}
+        GROUP_CONTEXT: eeyun-mysql-bldr-group
+        PKG_CONTEXT: mysql
         MACHINE_EXPORT_AWS_ACCESS_KEY_ID: (( grab meta.aws.access_key_id ))
         MACHINE_EXPORT_AWS_SECRET_ACCESS_KEY: (( grab meta.aws.secret_access_key ))
         MACHINE_EXPORT_AWS_REGION: (( grab meta.aws.region ))
@@ -83,8 +70,8 @@ jobs:
         AWS_SECRET_KEY: (( grab meta.aws.secret_access_key ))
         AWS_REGION: (( grab meta.aws.region ))
       inputs:
-      - name: ${package_name}-tests
-      - name: ${hab_origin}-${package_name}-bldr-group
+      - name: mysql-tests
+      - name: eeyun-mysql-bldr-group
       outputs:
       - name: notify_message
       run:
@@ -95,17 +82,17 @@ jobs:
         username: Hab-CI
         icon_url: https://brand.chef.io/images/habitat/logos/logo-3.png
         text_file: notify_message/message
-- name: release-${package_name}
+- name: release-mysql
   public: true
   plan:
   - (( inline ))
   - aggregate:
     - (( inline ))
-    - get: ${hab_origin}-${package_name}-bldr-group
-      passed: [test-${package_name}]
+    - get: eeyun-mysql-bldr-group
+      passed: [test-mysql]
       trigger: true
     - {get: habitat-plans-ci}
-  - task: release-${package_name}
+  - task: release-mysql
     privileged: true
     config:
       platform: linux
@@ -113,19 +100,19 @@ jobs:
         type: docker-image
         source: { repository: eeyun/habitat-plans-pipeline }
       params:
-        GROUP_CONTEXT: ${hab_origin}-${package_name}-bldr-group
-        PKG_CONTEXT: ${hab_origin}/${package_name}
+        GROUP_CONTEXT: eeyun-mysql-bldr-group
+        PKG_CONTEXT: eeyun/mysql
       inputs:
-      - name: ${hab_origin}-${package_name}-bldr-group
+      - name: eeyun-mysql-bldr-group
       - name: habitat-plans-ci
       outputs:
       - name: notify_message
       run:
         path: ./habitat-plans-ci/ci/scripts/release_notify
   - aggregate:
-    - put: ${hab_origin}-${package_name}-bldr-group
+    - put: eeyun-mysql-bldr-group
       params:
-        result: ${hab_origin}-${package_name}-bldr-group
+        result: eeyun-mysql-bldr-group
       on_success:
         put: notify
         params:
@@ -140,27 +127,14 @@ jobs:
           text_file: notify_message/failure_message
 
 resources:
-- name: ${hab_origin}-${package_name}-bldr-group
+- name: eeyun-mysql-bldr-group
   type: bldr-job
   source:
     origin: (( grab meta.habitat.origin ))
-    name: ${package_name}
+    name: mysql
     auth_token: (( grab meta.habitat.auth_token ))
-- name: ${package_name}-tests
+- name: mysql-tests
   type: git
   source:
     uri: https://github.com/eeyun/ci-hab-test.git
-    paths: [${package_name}/tests/*]
-EOF
-#      fi
-    fi
-  done
-
-  trap "rm -f ${PIPELINE}/.deploy.yml" INT QUIT TERM EXIT
-  spruce merge base.yml packages/*.yml > .deploy.yml && \
-    REDACT=yes spruce merge --prune meta base.yml packages/*.yml > pipeline.yml && \
-    fly --target lite2 set-pipeline --pipeline habitat-plans --config .deploy.yml     &&
-    fly --target lite2 unpause-pipeline --pipeline habitat-plans
-
-  rm -rf packages tests
-popd >/dev/null
+    paths: [mysql/tests/*]

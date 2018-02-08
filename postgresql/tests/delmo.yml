@@ -1,17 +1,17 @@
 suite:
-  name: starkandwayne-postgresql
+  name: core-postgresql
   system: docker-compose.yml
   task_service: tests
 
 tests:
-- name: persist-value-standalone
-  spec:
-  - wait: is-ready-standalone
-  - exec:
-    - persist-value-standalone
-  - assert:
-    - retrieve-value-standalone
-
+#- name: persist-value-standalone
+#  spec:
+#  - wait: is-ready-standalone
+#  - exec:
+#    - persist-value-standalone
+#  - assert:
+#    - retrieve-value-standalone
+#
 - name: replication
   spec:
   - wait: is-ready-cluster
@@ -22,22 +22,6 @@ tests:
   - wait: leader-is-gone
   - assert:
     - retrieve-value-cluster
-  # this section isn't working pending https://github.com/habitat-sh/habitat/issues/2977
-  # - start: [pg1, pg2]
-  # - wait: is-ready-cluster
-  # - assert:
-  #   - retrieve-value-pg1
-  #   - persist-other-value-cluster
-  #   - retrieve-other-value-cluster
-  # - stop: [pg3]
-  # - wait: leader-is-gone
-  # - assert:
-  #   - retrieve-other-value-cluster
-  # - start: [pg3]
-  # - wait: is-ready-cluster
-  # - assert:
-  #   - persist-value-cluster
-
 
 tasks:
 - name: is-ready-standalone
