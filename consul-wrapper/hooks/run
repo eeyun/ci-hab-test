@@ -1,0 +1,4 @@
+#!/bin/sh
+
+echo "I am a dummy service"
+sleep 1000000000000000000000
